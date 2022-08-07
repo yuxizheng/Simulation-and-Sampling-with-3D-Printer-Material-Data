@@ -1,0 +1,524 @@
+---
+title: "StatComp Project 1: Simulation and sampling"
+author: "YUXI ZHENG (s2265133, yuxizheng)"
+output:
+  html_document:
+    number_sections: yes
+  pdf_document:
+    number_sections: yes
+header-includes:
+  - \newcommand{\bm}[1]{\boldsymbol{#1}}
+  - \newcommand{\mat}[1]{\begin{bmatrix}#1\end{bmatrix}}
+---
+
+```{r setup, include = FALSE}
+# Modify this setup code chunk to set options
+# or add extra packages etc if needed.
+# See the project instructions for more details
+# on what code to show, and where/how.
+
+# Set default code chunk options
+knitr::opts_chunk$set(
+  echo = TRUE,
+  eval = TRUE
+)
+
+suppressPackageStartupMessages(library(tidyverse))
+theme_set(theme_bw())
+suppressPackageStartupMessages(library(StatCompLab))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(mvtnorm))
+suppressPackageStartupMessages(library(matlib))
+suppressPackageStartupMessages(library(knitr))
+suppressPackageStartupMessages(library(kableExtra))
+suppressPackageStartupMessages(library(latex2exp))
+suppressPackageStartupMessages(library(ggpubr))
+suppressPackageStartupMessages(library(styler))
+suppressWarnings(expr)
+
+# turn-off scientific notation like 1e+48 and plot warning
+options(scipen = 999)
+
+# To give the same random number sequence every time the document is knit:ed,
+# making it easier to discuss the specific numbers in the text:
+set.seed(12345L)
+
+```
+
+```{r code=readLines("code.R"), eval=TRUE, echo=FALSE}
+# Do not change this code chunk
+# Load function definitions
+source("code.R")
+```
+
+
+# Confidence interval approximation assessment 
+
+We investigate the behavior of an approximate as well as a non-approximate method for confidence interval construction, for the expectation parameter $\lambda$ for observations $y_i\,\,\sim \,\,\mathrm{Pois}\left( \lambda \right)$. We denote the method with approximation as $\mathrm{CI}_1$ and the method with non approximation as $\mathrm{CI}_2$.
+
+
+## Theoretical interval 
+
+Let $\mathrm{z}=\,\,\mathrm{z}_{1-\mathrm{\alpha}/2}\,\,=\,\,-\mathrm{z}_{\mathrm{\alpha}/2}$. 
+The confidence interval construction was motivated by the ratio $\frac{\hat{\lambda}-\lambda}{\sqrt{\frac{\lambda}{n}}}$. 
+
+For method 1, the parameterization we choose is $$\theta =\lambda , \hat{\theta}_{ML}=\frac{1}{n}\sum_{i=1}^n{y_i=\overline{y}}.$$ So the ratio for confidence interval construction is approximated by $\frac{\hat{\lambda}-\lambda}{\sqrt{\frac{\widehat{\lambda }}{n}}}$.
+
+For method 2, we use the same parameterization as method 1 but construct the confidence interval by solving the inequality of z-scores and the ratio, which is
+$$
+-z<\frac{\hat{\lambda}-\lambda}{\sqrt{\frac{\lambda}{n}}}<z,
+$$
+for $\alpha <0.5$, $z=z_{1-\alpha /2}>0$.
+
+First we solve the inequality on the left hand side. Let $x=\sqrt{\lambda}$, for the inequality $-z<\frac{\hat{\lambda}-\lambda}{\sqrt{\frac{\lambda}{n}}}$, then
+$$
+-z<\frac{\sqrt{n}\left( \widehat{\lambda }-x^2 \right)}{x}.
+$$
+
+It is equivalent to
+$$
+\left( x+\frac{a}{2\sqrt{n}} \right) ^2<\hat{\lambda}+\frac{z^2}{4n}.
+$$
+
+Therefore by solving the inequality, we get
+$$
+-\frac{z}{2\sqrt{n}}-\sqrt{\hat{\lambda}+\frac{z^2}{4n}}<x<-\frac{z}{2\sqrt{n}}+\sqrt{\hat{\lambda}+\frac{z^2}{4n}}.
+$$
+
+Since $x>0$, by taking the square of $z$, we have
+$$
+\lambda <\hat{\lambda}+\frac{z^2}{2n}+z\sqrt{\frac{\hat{\lambda}}{n}+\frac{z^2}{4n^2}}.
+$$
+
+Similarly, for the inequality $\frac{\sqrt{n}\left( \widehat{\lambda }-x^2 \right)}{x}<z$, we have 
+$$
+\lambda >\hat{\lambda}+\frac{z^2}{2n}-z\sqrt{\frac{\hat{\lambda}}{n}+\frac{z^2}{4n^2}}.
+$$
+
+So for method 1 and method 2, the confidence interval for $\lambda$ from observations $y_i\,\,\sim \,\,\mathrm{Pois}\left( \lambda \right)$, $\mathrm{i} =\,\,1,...,\mathrm{n}$ are given by
+$$\begin{aligned}
+\mathrm{CI}_1\,\,&=\,\,\left( \overline{y}-z\sqrt{\frac{\overline{y}}{n}}, \overline{y}+z\sqrt{\frac{\overline{y}}{n}} \right) 
+\\
+\mathrm{CI}_2\,\,&=\,\,\left( \overline{y}+\frac{z^2}{2n}-z\sqrt{\frac{\overline{y}}{n}+\frac{z^2}{4n}}, \overline{y}+\frac{z^2}{2n}+z\sqrt{\frac{\overline{y}}{n}+\frac{z^2}{4n}} \right) 
+\end{aligned}$$.
+
+
+## Confidence interval coverage
+
+To investigate the empirical coverage of the two methods, we first look at the case $n\,\,=\,\,2,   \,\lambda \,\,=\,\,3$ with a nominal coverage of 90%. The estimate of the coverage probability is seen as the proportion of the N simulations that the intervals cover the true $\lambda$ value. In this case, $N\,\,=\,\,10000$ and $\alpha\,\,=\,\,0.1$. 
+
+The coverage probability is our scale to measure the performance of our two methods. In the table below, we compute the coverage probability for the two methods, and for the case of $n\,\,=\,\,2, \,\lambda \,\,=\,\,3$, the non-approximation method has a closer coverage of 90%.
+
+```{r coverage for one case, echo=FALSE}
+
+# preparation 
+n <- c(2, 10, 50, 100, 150, 200)
+CI1 <- vector()
+CI2 <- vector()
+alpha <- 0.1
+
+# compute CI for each sample size
+for (val in n) {
+  CI1 <- append(CI1, estimate_coverage(CI_approx, n = val, alpha = alpha))
+  CI2 <- append(CI2, estimate_coverage(CI_non_approx, n = val, alpha = alpha))
+}
+
+# show dataframe
+coverage <- data.frame(n = n,
+                   CI1 = CI1,
+                   Dif_CI1 = abs(0.9-CI1),
+                   CI2 = CI2,
+                   Dif_CI2 = abs(0.9-CI2))
+coverage %>%
+  kable(col.names = c("n", "Approximation Coverage", "Difference to 90% Coverage", "Non-Approximation Coverage", "Difference to 90% Coverage")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+As shown in the table above, we would like to discuss how the number of observations $\mathrm{n}$ will affect the coverage probability for the two methods. By running the simulations with $n\,\,=\,\,2, 4, 6, ..., 200$, we compute the coverage for each case. The result is shown in the plot below.
+
+```{r prepare_data_CI, echo=FALSE, warning=FALSE}
+
+# preparation
+n <- seq(2, 200, by=2)
+CI1 <- vector()
+CI2 <- vector()
+alpha <- 0.1
+
+# compute confidence interval
+for (val in n) {
+  CI1 <- append(CI1, estimate_coverage(CI_approx, n = val, alpha = alpha))
+  CI2 <- append(CI2, estimate_coverage(CI_non_approx, n = val, alpha = alpha))
+}
+
+# construct dataframe
+coverage_large_sample <- data.frame(n = n,
+                   CI1 = CI1,
+                   CI2 = CI2)
+
+# plot the dataframe
+  plot_estimate_coverage <- ggplot(coverage_large_sample) + 
+  geom_point(aes(n, CI1, colour = "CI1")) + 
+  geom_point(aes(n, CI2, colour = "CI2")) + 
+  geom_smooth(aes(n, CI1, colour = "CI1"), se = FALSE, method = "gam", formula = y~x) + 
+  geom_smooth(aes(n, CI2, colour = "CI2"), se = FALSE, method = "gam", formula = y~x) + 
+  geom_hline(yintercept = 0.9, size=0.6, alpha=.4) + 
+  xlim(c(1, 200)) + 
+  ylim(c(0.85, 0.95)) +
+   scale_colour_manual("", 
+                      breaks = c("CI1", "CI2"),
+                      values = c("red","blue")) + 
+  labs(subtitle="Estimate Coverage with Increasing n", 
+       y="Estimate Coverage", 
+       x="n", 
+       title="Scatterplot")
+plot(plot_estimate_coverage)
+```
+
+As shown in the plot, in the beginning, when n is relatively small, method 2 is better at predicting the value of $\lambda$ with a non-approximation interval. As n increases, the approximation in method 1 gives a better accuracy when capturing the interval, so that the performance of method 1 improves, even surpasses that of method 2. This improvement of accuracy for MLE estimation shows the approximation method's high flexibility and the robustness and limitation of the non-approximation method. It is also shown in the theorem that, Given $\widehat{\theta }$, the maximum likelihood estimator for a parameter $\theta$ of distribution, we know that:
+$$\sqrt{n}\left( \widehat{\theta }-\theta \right) \,\,\rightarrow N\left( 0,\frac{1}{I\left( \theta \right)} \right),$$ 
+where $I\left( \theta \right)$ is the Fisher information. In this case, we can see how the sample size is playing a crucial role in the method of constructing confidence interval and how we should choose the method accordingly.
+
+
+# Three Dimension printer materials prediction
+
+Given the CAD weight for observations $x_i$, the corresponding actual weight $y_i$ is modeled as realizations from $$
+\mathrm{Normal}\left[ \mathrm{\beta}_1+\mathrm{\beta}_2\mathrm{x}_{\mathrm{i}}, \mathrm{\beta}_3+\mathrm{\beta}_4\mathrm{x}_{\mathrm{i}}^{2} \right] 
+$$. Let 
+The prior distribution for each $\mathrm{\beta}_{\mathrm{j}}, \mathrm{j} =\,\,1, 2 ,3 , 4$ is shown as follow: 
+$$\begin{aligned}
+\theta _1&\sim \mathrm{Normal}\left( 0,\mathrm{\gamma}_1 \right) 
+\\
+\theta _2&\sim \mathrm{Normal}\left( 1,\mathrm{\gamma}_2 \right) 
+\\
+\mathrm{\theta}_3&\sim \mathrm{LogExp}\left( \mathrm{\gamma}_3 \right) 
+\\
+\,\,\mathrm{\theta}_4&\sim \mathrm{LogExp}\left( \mathrm{\gamma}_4 \right) 
+\end{aligned}$$.
+
+## Load data
+
+First, we load the data from CAD, where x takes the value of CAD weight and y takes the actual weight value. From the physics assumption, the error in CAD weight is proportional to the weight itself. By plotting the data, we can see this probable tendency. 
+
+In the following sections, we will start by constructing a Bayesian method and importance sampling for estimating parameters for our model. Then we will implement them and discuss the results in detail.
+
+```{r load data and plot, echo=FALSE}
+
+# import data from StatCompLab
+mydata <- as.data.frame(filament1)
+x <- t(as.vector(mydata['CAD_Weight']))
+y<- t(as.vector(mydata['Actual_Weight']))
+
+# plot data
+ggplot(filament1, aes(CAD_Weight, Actual_Weight, colour = Material)) +
+  geom_point() +
+  ylab("Actual Weight") + 
+  xlab("CAD Weight")
+```
+
+
+## Prior density
+Given the parameters $\left( \mathrm{\gamma}_1, \mathrm{\gamma}_2, \mathrm{\gamma}_3, \mathrm{\gamma}_4 \right)$, we want to compute the prior density for a set of $\left( \theta _1, \theta _2, \theta _3, \theta _4 \right)$. We can compute the prior density for $\theta$ respectively with the distributions mentioned above, by using `dnorm` for $\theta_1$, $\theta_2$ and `dlogexp` for $\theta_3$, $\theta_4$. By taking logarithmic value of the density, the logarithmic joint density is 
+$$
+\log \left( \mathrm{p}\left( \theta |\lambda \right) \right) \,\,=\,\,\sum_{i=1}^4{\log \left( \mathrm{p}\left( \theta _i|\lambda \right) \right)}.
+$$
+
+
+## Observation likelihood
+
+When given the observation values of $y_i$ and the ideal values of $x_i$ with the sample size $n$, we could in turn compute the observation likelihood for a set of $\left( \theta _1, \theta _2, \theta _3, \theta _4 \right)$ using `dnorm` The logarithmic observation likelihood for each $\theta_j$ is
+$$
+\log \left( \mathrm{p}\left( y|x,\theta \right) \right) =\sum_{i=1}^n{\log \left( \mathrm{p}\left( y_i|x_i,\theta \right) \right)}.
+$$
+
+
+## Posterior density
+
+With the prior density and the observation likelihood, we can compute the posterior density. We know that 
+$$\mathrm{p}\left( \theta |y \right) =\frac{\mathrm{p}\left( y|\theta \right) \mathrm{p}\left( \theta \right)}{\mathrm{p}\left( y \right)}.$$
+
+Since we want to find the MLE for $\theta$, the marginal density for y, $\mathrm{p}\left( \mathrm{y} \right)$ can be ignored in the optimization process so the value returned in `log_posterior_density` omits it. the logarithmic posterior density is
+$$
+\log \left( \mathrm{p}\left( \theta |y \right) \right) \,\,=\,\,\log \left( \mathrm{p}\left( \theta \right) \right) \,\,+\,\,\log \left( \mathrm{p}\left( y|\theta \right) \right) \,\,-\,\,\log \left( \mathrm{p}\left( y \right) \right) .
+$$
+
+
+## Posterior mode and Gaussian approximation
+
+Given that $\mathrm{\gamma}_{\mathrm{i}}\,\,=\,\,1, \mathrm{i} =1, 2, 3, 4$, with data for $x$ and $y$, we could find the posterior mode for $\theta$ when the posterior density is maximized using `optim`. By obtaining the mode $\mathrm{\theta}_{\mathrm{MLE}}$ and the corresponding inverse of the negated Hessian$-\mathrm{H}^{-1}$, the multivariate Normal approximation is
+$$\mathrm{Normal}\left( \mathrm{\theta}_{\mathrm{MLE}}, -\mathrm{H}^{-1} \right).$$
+
+For our case of 3D printer prediction, we compute the mode and the negated Hessian matrix for $\theta$.
+
+```{r Gaussian_approximation, echo=FALSE}
+
+# let gammas be 1
+params <- c(1,1,1,1) 
+
+# initial vector for theta approximation
+initial_vector <- c(0,0,0,0)
+
+# use negated log posterior density, since the default mode for optim() is minimize
+opt <- optim(initial_vector, log_posterior_density, x = x, y = y, 
+             params = params, method = "BFGS", control = list(fnscale = -1), hessian = TRUE)
+
+# evaluate the inverse of the negated Hessian, note that opt$hessian is the negated version already
+inverse_negated_Hessian <- -1 * solve(opt$hessian)
+
+# show the mode and inverse negated Hessian for the 
+optimization_result <- list(mode = opt$par,
+                   inverse_negated_Hessian = inverse_negated_Hessian)
+writeLines("The mode is: ")
+print(opt$par)
+writeLines("The inverse negated Hessian matrix is: ")
+print(inverse_negated_Hessian)
+```
+
+
+## Importance sampling function
+
+In `do_importance`, we first generate $N$ observations $\mathrm{\eta}_{\mathrm{i}}, \mathrm{i} =1,...,\mathrm{N}$, from $\mathrm{Normal}\left( \mathrm{\mu}, \mathrm{S} \right)$, where the mean and the covariance matrix are given. Then for each set of sample $\theta_i$, the logarithmic weights is
+$$
+\log \left( w_i \right) \,\,=\,\,\log \left( \mathrm{p}\left( \theta _i \right) \right) \,\,+\,\,\log \left( \mathrm{p}\left( y|\theta _i \right) \right) \,\,-\,\,\log \left( \mathrm{\tilde{p}}\left( \theta _i|y \right) \right).
+$$
+
+In order to make sure that the sum of the weights is 1, the logarithmic normalized weight is used,
+$$
+\log \left( w_{i\_\mathrm{normalized}} \right) \,\,=\,\,\log \left( w_i \right) \,\,-\,\,\log \left( \sum_j{\exp \left( w_j \right)} \right).
+$$
+
+
+## Importance sampling amd CDF plots
+
+With the functions defined above, we generate the importance sample with size of 10000, the empirical weighted CDF together with the un-weighted CDF for $\beta_i,i=1,2,3,4$ is shown below. The importance weighted sample is very close to the original one.
+
+```{r generate_samples, echo=FALSE}
+
+# 1-alpha is the intended coverage possibility
+alpha <- 0.1
+
+# generate beta samples with log weights from do_importance
+df <- do_importance(N = 10000, mu = opt$par, S = inverse_negated_Hessian, x = x, y = y, params = params)
+
+# compute weights from log weights
+df['weights'] <- exp(as.numeric(df[,'log_weights']))
+```
+
+```{r plot_importance_sampling, echo=FALSE, warning=FALSE, message=FALSE}
+
+# transform data frame df with pivot_longer
+df_pivot <- df %>% pivot_longer(cols = starts_with("beta"), names_to = "Beta", values_to = "sample")
+
+# plot weighted and un-weighted CDF for each beta
+CDF <- ggplot(df_pivot) +
+  ylab("CDF") +
+  xlim(-0.4,1.25) + 
+  stat_ewcdf(aes(sample, weights = weights, col = "Importance")) +
+  stat_ecdf(aes(sample, col = "Unweighted")) +
+  facet_wrap(vars(Beta))
+plot(CDF)
+```
+
+We know that if x is from a Normal distribution, the prior and posterior for the mean parameter are conjugate distributions, specifically, for $\mu \,\,\sim \,\,\mathrm{N}\left( a,b^2 \right)$, the posterior distribution is 
+$$
+\mu \,\,\sim \mathrm{N}\left( \frac{\frac{a}{b^2}+\frac{n\overline{x}}{\sigma ^2}}{\frac{n}{\sigma ^2}+\frac{1}{b^2}},\frac{1}{n/\sigma ^2+\frac{1}{b^2}} \right). 
+$$
+
+Therefore we can investigate the distribution of $\beta_1$ samples to find possible improvements. With the information provided above, when plotting CDF of a normal distribution with our weighted and original samples, we can see that it is reasonable that we model $\beta_1$ with a normal distribution. The importance sampling estimation is approximately the same as the given normal distribution. The un-weighted sample is also close to the given normal distribution. Therefore, the Gaussian approximation of the posterior distribution of $\beta_1$ could be a good approximation for our 3D printer model. For $\beta_i, i = 2,3,4$, further information for investigation is needed. Suppose we keep subtracting information of the density using this method. In that case, we could improve our prior distribution so that even with limited data, we could achieve a level of accuracy for $\beta$.
+
+```{r plot importance sampling with theoretical distribution, echo=FALSE, warning=FALSE}
+
+# obtain beta value from mode
+beta <- c(opt$par[1], opt$par[2], exp(opt$par[3]), exp(opt$par[4]))
+
+# plot beta 1 
+CDF_Beta1 <- ggplot(df) +
+  ylab("CDF") +
+  stat_ewcdf(aes(beta1, weights = weights, col = "Importance")) +
+  stat_ecdf(aes(beta1, col = "Unweighted")) +
+  geom_function(fun = pnorm, n = 100, args = list(mean = beta[1], sd = 0.1), mapping = aes(col = "Normal(-0.l, 0.01)"))
+plot(CDF_Beta1)
+```
+
+
+## Confidence interval with importance sampling
+
+Now we can predict $\beta$ with a weighted confidence interval. Using the `wquantile`, we construct the confidence interval for $\theta$ with the importance sample, shown in the table below.
+
+```{r evaluate_confidence_interval, echo=FALSE, results='asis'}
+
+# compute confidence interval with weighted importance sampling samples
+CI_beta1 <- make_CI(df$beta1, df$weights, 0.9)
+CI_beta2 <- make_CI(df$beta2, df$weights, 0.9)
+CI_beta3 <- make_CI(df$beta3, df$weights, 0.9)
+CI_beta4 <- make_CI(df$beta4, df$weights, 0.9)
+
+# construct and show table
+CI_beta <- rbind(CI_beta1, CI_beta2, CI_beta3, CI_beta4)
+CI_beta["Width"] <- CI_beta$Upper - CI_beta$Lower
+rownames(CI_beta) <- c("Beta 1", "Beta 2", "Beta 3", "Beta 4")
+CI_beta %>%
+  kable() %>%
+  kable_material(c("striped", "hover"))
+```
+
+
+## Prediction interval plots
+
+We now investigate the prediction of our model by first comparing it to a model with linear estimation, then discussing the results from the view both mathematically and in a production application. 
+
+We have computed the point estimation for $\beta$ in the "Posterior mode and Gaussian approximation" section. By defining a function to calculate the 90% confidence interval and mean and standard deviation for a given CAD weight, which is `model_prediction`, the prediction interval plot based on point estimates of the parameters is shown below. In the view of the 3D printer application, the model accurately measures the proportion of increasing variance, with most of the points falling into the interval.
+
+```{r prediction interval plot, echo=FALSE, results='asis'}
+
+# obtain theta from optim
+theta <- opt$par
+
+# define function make confidence to produce the mean, sd, lwr, upr for the x value
+pred_bayes <- model_prediction(x, theta, 0.9)
+
+# plot with prediction interval
+prediction_interval <- ggplot(cbind(pred_bayes, filament1),
+  mapping = aes(CAD_Weight)) +
+  geom_line(aes(y = mean)) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.25) +
+  geom_point(aes(y = Actual_Weight), data = filament1) +
+  ylab("Actual Weight") +
+  xlab("CAD Weight")
+
+plot(prediction_interval)
+```
+
+To better analyze it, we compute scores for our model. The squared error, Dawid-Sebastiani, and interval scores with 90% coverage are below. 
+```{r score comparison, echo=FALSE}
+
+# compute score
+scores <-
+  rbind(cbind(pred_bayes, filament1, model = "bayes with entire dataset")) %>%
+  mutate(
+    se = proper_score("se", Actual_Weight, mean = mean),
+    ds = proper_score("ds", Actual_Weight, mean = mean, sd = sd),
+    interval = proper_score("interval", Actual_Weight,
+                            lwr = lwr, upr = upr, alpha = 0.1)
+  )
+
+# construct and show table
+score_summary <- scores %>%
+  group_by(model) %>%
+  summarise(se = mean(se),
+            ds = mean(ds),
+            interval = mean(interval))
+
+score_summary%>%
+  kable(col.names = c("model", "squared error", "Dawid-Sebastiani", "Interval scores")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+To further investigate the performance of the model, we build our model from scratch using 50% data for training and 50% for validation. It is shown in the table below. We can see that, with the scores above, our model still provides reasonable prediction.
+
+```{r split data for prediction, echo = FALSE}
+
+# split data
+idx_est <- sample(filament1$Index,
+                  size = round(nrow(filament1) * 0.5),
+                  replace = FALSE)
+filament1_est <- filament1 %>% filter(Index %in% idx_est)
+filament1_pred <- filament1 %>% filter(!(Index %in% idx_est))
+
+# build bayes model from scratch and compute prediction interval
+opt_split <- optim(initial_vector, log_posterior_density, x = filament1_est$CAD_Weight, y = filament1_est$Actual_Weight, 
+             params = params, method = "BFGS", control = list(fnscale = -1), hessian = TRUE)
+pred_bayes_split <- model_prediction(filament1_pred$CAD_Weight, opt_split$par, 0.9)
+
+scores <-
+  cbind(pred_bayes_split, filament1_pred, model = "bayes with 50% training data") %>%
+  mutate(
+    se = proper_score("se", Actual_Weight, mean = mean),
+    ds = proper_score("ds", Actual_Weight, mean = mean, sd = sd),
+    interval = proper_score("interval", Actual_Weight,
+                            lwr = lwr, upr = upr, alpha = 0.1)
+  )
+
+# construct and show table
+score_summary <- scores %>%
+  group_by(model) %>%
+  summarise(se = mean(se),
+            ds = mean(ds),
+            interval = mean(interval))
+
+score_summary%>%
+  kable(col.names = c("model", "squared error", "Dawid-Sebastiani", "Interval scores")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+From the view of the implementation method, by plotting the prediction interval, it is clear that our sampling method is built on an accurate Bayesian model and has the potential of improvement on accuracy with more input data.  
+
+From the view of 3D printer application, firstly, in the model, the variance growing with quadratic speed suggests that one way to narrow down the difference between CAD weight and actual weight is to break the relatively heavy part of the printing object into little pieces, making each part lighter. Secondly, we could investigate the factors that influence $\beta_3$ and $\beta_4$, by introducing parameters related to physics into the prior distribution and performing the modeling process.
+
+
+
+## Importance weights plot with Beta
+
+To look into the improvement for the sampling method, we plot the importance log-weights for each $\beta$ to investigate the relationship between weights and sampled value. By normalizing the importance weights by their average and scaling them logarithmically, we know that the value above 1 has corresponding sample values that should occur more often in the true target distribution than in raw samples and vice versa. 
+
+For $\beta_1$, there is a mild suggestion that the value should have landed more on the negative side. For $\beta_3$, it is shown that value should have concentrated in the area around 0 to 0.5; instead, in the sample, it spreads to some larger values. For $\beta_4$, less value should have concentrated in the area that is approximately smaller than 0.0015. For $\beta_i, i=1,2,4$, we can see that the weights form a relatively balanced plot, with most weights close to 1. This also indicates that the sample is in accord with the true target distribution.
+
+```{r importance log weight plot, echo=FALSE, results='asis'}
+
+# plot log weights
+log_weight_plot_1 <- ggplot(df) +
+  ylab("Importance weights") +
+  geom_point(aes(beta1, y = weights / mean(weights))) +
+  geom_hline(yintercept = 1) +
+  scale_y_log10() 
+
+log_weight_plot_2 <- ggplot(df) +
+  geom_point(aes(beta2, y = weights / mean(weights))) +
+  geom_hline(yintercept = 1) +
+  theme(axis.title.y=element_blank(),
+      axis.ticks.y=element_blank()) + 
+  scale_y_log10() 
+
+log_weight_plot_3 <- ggplot(df) +
+  ylab("Importance weights") +  
+  geom_point(aes(beta3, y = weights / mean(weights))) +
+  geom_hline(yintercept = 1) +
+  scale_y_log10() 
+
+log_weight_plot_4 <- ggplot(df) +
+  geom_point(aes(beta4, y = weights / mean(weights))) +
+  geom_hline(yintercept = 1) +
+  theme(axis.title.y=element_blank(),
+      axis.ticks.y=element_blank()) +
+  scale_y_log10() 
+
+# combine plots
+ggarrange(log_weight_plot_1, log_weight_plot_2, log_weight_plot_3, log_weight_plot_4, 
+          ncol = 2, nrow = 2)
+```
+
+
+## Effective sample size
+The importance weights plots indicate that the sampling method may have the potential of improvement. By computing the effective sample size $\frac{\left( \sum_k{w_k} \right) ^2}{\sum_k{w_k^2}}$, we know that the current sample size is ideal. 
+
+```{r effective sample size, echo=FALSE}
+
+# compute effective sample size
+weights_square <- df$log_weights^2
+eff_sample_size <- sum(df$log_weights)^2 / sum(weights_square)
+
+# write
+writeLines("The effective sample size is: ")
+print(eff_sample_size)
+```
+
+
+### Summary
+
+We implement our model with importance sampling, discuss the performance numerically and practically. The CDF plots imply that there is still information unveiled between CAD weights and $\beta$; more patterns could be found in the posterior distribution. From the prediction interval, we investigate how actual weights waver by the influence of CAD weights. Last, we look into the relationship between weights and value of $\beta$ in the sampling method and discuss possible improvements.
+
+
+# Code appendix
+
+```{r code=readLines("code.R"), eval=FALSE, echo=TRUE}
+# Do not change this code chunk
+```
